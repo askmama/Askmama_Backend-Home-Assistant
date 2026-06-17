@@ -14,3 +14,5 @@ app.include_router(router)
 @app.get("/")
 def health():
     return {"status": "AskMama backend running"}
+
+##python mama_voice.py
