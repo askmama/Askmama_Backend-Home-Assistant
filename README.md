@@ -40,12 +40,6 @@ A voice-driven smart inventory system. A physical scale detects weight changes v
    pip install -r requirements.txt
    ```
 
-   The voice agent (`mama_voice.py`) has additional dependencies not in `requirements.txt`:
-
-   ```bash
-   pip install groq elevenlabs sounddevice numpy openwakeword
-   ```
-
 4. **Configure environment variables**
 
    Create a `.env` file in the project root:
