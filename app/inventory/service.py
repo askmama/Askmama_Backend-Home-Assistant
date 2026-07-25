@@ -12,7 +12,7 @@ def _owner_for_device(device_id: str) -> str | None:
     hit = _owner_cache.get(device_id)
     if hit and time.monotonic() - hit[1] < _OWNER_TTL_S:
         return hit[0]
-    res = supabase.table("devices").select("user_id").eq("device_id", device_id).limit(1).execute()
+    res = supabase.table("user_device_table").select("user_id").eq("device_id", device_id).limit(1).execute()
     user_id = res.data[0]["user_id"] if res.data else None
     # Only cache resolved owners; keep retrying lookups for still-unclaimed devices.
     if user_id is not None:
