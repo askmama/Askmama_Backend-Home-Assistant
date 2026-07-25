@@ -81,5 +81,14 @@ All required in `.env` (loaded by pydantic-settings):
 
 ## Supabase Tables
 
-- **`events`** — weight change log (device_id, weight_g, delta_g, compartment, event_type, timestamp, raw_payload)
-- **`items`** — registered inventory items (name, unit_weight_g, low_stock_threshold, current_weight_g, current_quantity, device_id)
+Schema source of truth: `../Askmama_Frontend/supabase/migrations/` (0001–0013) and
+`../Askmama_Frontend/types/index.ts`. Read those before changing any query here.
+
+- **`events`** — weight change log (device_id, user_id nullable, weight_g, delta_g, compartment, event_type, timestamp, raw_payload). Written only by this backend (service_role key, bypasses RLS); user_id=null for unclaimed devices, adopted on claim.
+- **`items`** — registered inventory items (user_id, name, unit_weight_g, low_stock_threshold). No device_id — items reach a scale via `items_to_bins` → `bins.device_id` (migration 0008 dropped `items.device_id`).
+- **`shelves`** → **`bins`** → **`items_to_bins`** — physical layout. One bin == one claimed device (`bins.device_id` unique, created by claim/register RPCs); `position` on a shelf drives adjacency for reconciliation. An item may sit in several bins; `items_to_bins.quantity` is a manual fallback where no live weight exists.
+- **`device_registry`** — seeded per physical scale (claim_code, claimed_by). Function-only access via RPCs: `seed_device`, `claim_device`, `register_device`, `release_device`.
+- **`user_device_table`** — device → user ownership (renamed from `devices` in 0010); what `_owner_for_device` reads.
+- **`profiles`**, **`voice_logs`** — auth.users mirror; voice interaction audit trail (annotated onto events via `annotate_voice_event` RPC).
+
+All tables are RLS-scoped to own rows, except: `events` SELECT is an email allowlist (0011), and — as of now — RLS on `events` itself is still disabled on the live project (0012 exists in the frontend repo but is unapplied), so its policies are inert.

@@ -50,14 +50,16 @@ def process_weight_event(device_id: str, payload: dict):
     check_low_stock(device_id, compartment, weight_g)
 
 def check_low_stock(device_id: str, compartment: int, current_weight: float):
-    result = supabase.table("items")\
-        .select("*")\
-        .eq("device_id", device_id)\
+    # items no longer carry device_id; they map to a device's bin via items_to_bins -> bins.
+    result = supabase.table("items_to_bins")\
+        .select("items(name, unit_weight_g, low_stock_threshold), bins!inner(device_id)")\
+        .eq("bins.device_id", device_id)\
         .execute()
 
-    for item in result.data:
-        if item["unit_weight_g"] and item["unit_weight_g"] > 0:
+    for row in result.data:
+        item = row.get("items")
+        if item and item["unit_weight_g"] and item["unit_weight_g"] > 0:
             estimated_qty = int(current_weight / item["unit_weight_g"])
-            threshold = item.get("low_stock_threshold", 3)
+            threshold = item.get("low_stock_threshold") or 3
             if estimated_qty <= threshold:
                 print(f"LOW STOCK: {item['name']} — ~{estimated_qty} units left")
