@@ -3,6 +3,7 @@ import ssl
 import threading
 import paho.mqtt.client as mqtt
 from app.core.config import settings
+from app.core.identity import DeviceIdentityError, resolve_device_id
 from app.inventory.service import process_weight_event
 
 def on_connect(client, userdata, flags, rc, properties=None):
@@ -15,10 +16,14 @@ def on_connect(client, userdata, flags, rc, properties=None):
 def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode())
-        device_id = msg.topic.split("/")[1]
+        device_id = resolve_device_id(msg.topic, payload)
         process_weight_event(device_id, payload)
+    except DeviceIdentityError as e:
+        # Misconfigured firmware, not a transient fault — drop rather than
+        # file the event under a device (and owner) we cannot confirm.
+        print(f"DROPPED event on {msg.topic}: {e}")
     except Exception as e:
-        print(f"Error processing MQTT message: {e}")
+        print(f"Error processing MQTT message: {type(e).__name__}: {e}")
 
 def start_mqtt():
     tls_context = ssl.create_default_context()
