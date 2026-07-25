@@ -46,17 +46,29 @@ def process_weight_event(device_id: str, payload: dict):
         "raw_payload": payload,
     }).execute()
 
-    # Check low stock against registered items
-    check_low_stock(device_id, compartment, weight_g)
+    # Check low stock against items in this scale's bin
+    check_low_stock(device_id, weight_g)
 
-def check_low_stock(device_id: str, compartment: int, current_weight: float):
-    result = supabase.table("items")\
-        .select("*")\
-        .eq("device_id", device_id)\
+def check_low_stock(device_id: str, current_weight: float):
+    # One scale == one bin, so the device_id resolves to a single bin. Items
+    # reach a scale through item -> items_to_bins -> bin -> device_id, so we
+    # look up the bin first, then the items mapped into it.
+    bin_res = supabase.table("bins").select("id").eq("device_id", device_id).limit(1).execute()
+    if not bin_res.data:
+        return  # scale not yet mounted in a bin
+    bin_id = bin_res.data[0]["id"]
+
+    # Pull the items mapped into this bin (nested select via the FK to items).
+    links = supabase.table("items_to_bins")\
+        .select("quantity, items(*)")\
+        .eq("bin_id", bin_id)\
         .execute()
 
-    for item in result.data:
-        if item["unit_weight_g"] and item["unit_weight_g"] > 0:
+    for link in links.data:
+        item = link.get("items")
+        # NOTE: the scale reports total bin weight, so per-item estimation is only
+        # meaningful when a bin holds a single item. This mirrors the prior behavior.
+        if item and item.get("unit_weight_g") and item["unit_weight_g"] > 0:
             estimated_qty = int(current_weight / item["unit_weight_g"])
             threshold = item.get("low_stock_threshold", 3)
             if estimated_qty <= threshold:

@@ -81,5 +81,11 @@ All required in `.env` (loaded by pydantic-settings):
 
 ## Supabase Tables
 
-- **`events`** — weight change log (device_id, weight_g, delta_g, compartment, event_type, timestamp, raw_payload)
-- **`items`** — registered inventory items (name, unit_weight_g, low_stock_threshold, current_weight_g, current_quantity, device_id)
+- **`devices`** — claimed scales (device_id, user_id)
+- **`events`** — weight change log (device_id, user_id, weight_g, delta_g, compartment, event_type, timestamp, raw_payload)
+- **`items`** — registered inventory items (name, unit_weight_g, low_stock_threshold, current_weight_g, current_quantity). Reached a scale via `items_to_bins` → `bins.device_id` (no direct device_id since migration 0007)
+- **`shelves`** — physical shelf (id, user_id, name). Holds many bins
+- **`bins`** — one bin per scale (id, user_id, shelf_id, device_id UNIQUE NOT NULL, position, name). A shelf has many bins; one scale = one bin. `position` orders bins on a shelf and drives cross-bin reconciliation adjacency
+- **`items_to_bins`** — item↔bin mapping (item_id, bin_id, quantity). An item may occupy several bins; total on hand = SUM(quantity)
+
+Canonical schema migrations live in the **frontend** repo (`../Askmama_Frontend/supabase/migrations/*.sql`), applied manually via the Supabase SQL editor. The bins/items_to_bins model is migration `0008_bins_items_mapping.sql` (supersedes 0007's `shelf_bins`; drops `items.device_id`).
